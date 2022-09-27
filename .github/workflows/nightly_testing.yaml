@@ -34,11 +34,8 @@ jobs:
       - name: Determine tag
         id: determine-tag
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "::set-output name=tag::$GITHUB_BASE_REF"
-          else
             echo "::set-output name=tag::$GITHUB_REF_NAME"
-          fi
+
 
   nightly_ub:
     runs-on: ubuntu-latest
@@ -116,12 +113,12 @@ jobs:
           meson test -C builddir --suite=nightly-small --print-errorlogs \
             --no-stdsplit
 
-      # - uses: actions/upload-artifact@v3
-      #   if: failure()
-      #   with:
-      #     name: build-artifact-ubuntu-${{ matrix.buildtype }}
-      #     path: |
-      #       builddir/meson-logs/
-      #       /var/log/messages
-      #       /var/log/syslog
-      #       /var/log/kern.log
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: build-artifact-ubuntu-${{ matrix.buildtype }}
+          path: |
+            builddir/meson-logs/
+            /var/log/messages
+            /var/log/syslog
+            /var/log/kern.log
