@@ -111,17 +111,22 @@ jobs:
             --buildtype=${{ matrix.buildtype }} -Dtools=enabled \
             -Ddocs=disabled -Dbindings=all
 
-      - name: Test
+      - name: Test hse-java
         run: |
-          meson test -C builddir --suite=nightly-small --print-errorlogs \
+           meson test -C builddir --suite=hse-java --print-errorlogs \
+            --no-stdsplit
+            
+      - name: Test hse-python
+        run: |
+           meson test -C builddir --suite=hse-python --print-errorlogs \
             --no-stdsplit
 
-      - uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: build-artifact-ubuntu-${{ matrix.buildtype }}
-          path: |
-            builddir/meson-logs/
-            /var/log/messages
-            /var/log/syslog
-            /var/log/kern.log
+      # - uses: actions/upload-artifact@v3
+      #   if: failure()
+      #   with:
+      #     name: build-artifact-ubuntu-${{ matrix.buildtype }}
+      #     path: |
+      #       builddir/meson-logs/
+      #       /var/log/messages
+      #       /var/log/syslog
+      #       /var/log/kern.log
