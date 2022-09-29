@@ -121,12 +121,12 @@ jobs:
            meson test -C builddir --suite=hse-python --print-errorlogs \
             --no-stdsplit
 
-      - uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: build-artifact-ubuntu-${{ matrix.buildtype }}
-          path: |
-            builddir/meson-logs/
-            /var/log/messages
-            /var/log/syslog
-            /var/log/kern.log
+      # - uses: actions/upload-artifact@v3
+      #   if: failure()
+      #   with:
+      #     name: build-artifact-ubuntu-${{ matrix.buildtype }}
+      #     path: |
+      #       builddir/meson-logs/
+      #       /var/log/messages
+      #       /var/log/syslog
+      #       /var/log/kern.log
