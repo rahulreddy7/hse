@@ -111,9 +111,14 @@ jobs:
             --buildtype=${{ matrix.buildtype }} -Dtools=enabled \
             -Ddocs=disabled -Dbindings=all
 
-      - name: Test
+      - name: Test hse-java
         run: |
-          meson test -C builddir --suite=nightly-small --print-errorlogs \
+           meson test -C builddir --suite=hse-java --print-errorlogs \
+            --no-stdsplit
+            
+      - name: Test hse-python
+        run: |
+           meson test -C builddir --suite=hse-python --print-errorlogs \
             --no-stdsplit
 
       - uses: actions/upload-artifact@v3
