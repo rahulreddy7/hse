@@ -26,6 +26,7 @@
 #include <hse_ikvdb/kvdb_home.h>
 #include <hse_ikvdb/kvs.h>
 
+#include <hse_util/err_ctx.h>
 #include <hse_util/event_counter.h>
 #include <hse_util/mutex.h>
 #include <hse_util/platform.h>
@@ -39,7 +40,8 @@
 
 #define HSE_KVDB_COMPACT_MASK  (HSE_KVDB_COMPACT_CANCEL | HSE_KVDB_COMPACT_SAMP_LWM)
 #define HSE_KVDB_SYNC_MASK     (HSE_KVDB_SYNC_ASYNC)
-#define HSE_KVS_PUT_MASK       (HSE_KVS_PUT_PRIO | HSE_KVS_PUT_VCOMP_OFF)
+#define HSE_KVS_PUT_MASK       (HSE_KVS_PUT_PRIO | HSE_KVS_PUT_VCOMP_OFF | HSE_KVS_PUT_VCOMP_ON)
+#define HSE_KVS_PUT_VCOMP_MASK (HSE_KVS_PUT_VCOMP_OFF | HSE_KVS_PUT_VCOMP_ON)
 #define HSE_CURSOR_CREATE_MASK (HSE_CURSOR_CREATE_REV)
 
 /* clang-format on */
@@ -101,7 +103,6 @@ hse_init(const char *const config, const size_t paramc, const char *const *const
     ulong memgb;
     merr_t err = 0;
     struct config *conf = NULL;
-    bool platform_initialized = false;
 
     if (HSE_UNLIKELY(paramc > 0 && !paramv))
         return merr(EINVAL);
@@ -134,9 +135,11 @@ hse_init(const char *const config, const size_t paramc, const char *const *const
         goto out;
     }
 
-    err = logging_init(&hse_gparams.gp_logging);
-    if (err)
-        return err;
+    err = logging_init(&hse_gparams.gp_logging, err_ctx_strerror);
+    if (err) {
+        log_errx("Failed to initialize logging", err);
+        goto out;
+    }
 
     /* First log message w/ HSE version - after deserializing global params */
     log_info("version %s, program %s", HSE_VERSION_STRING, hse_progname);
@@ -147,7 +150,6 @@ hse_init(const char *const config, const size_t paramc, const char *const *const
     err = hse_platform_init();
     if (err)
         goto out;
-    platform_initialized = true;
 
     err = ikvdb_init();
     if (err)
@@ -156,20 +158,19 @@ hse_init(const char *const config, const size_t paramc, const char *const *const
     if (hse_gparams.gp_socket.enabled) {
         err = rest_server_start(hse_gparams.gp_socket.path);
         if (ev(err)) {
-            log_warn("Could not start rest server on %s", hse_gparams.gp_socket.path);
+            log_warnx("Failed to start rest server on %s", err, hse_gparams.gp_socket.path);
             err = 0;
         } else {
-            log_info("Rest server started: %s", hse_gparams.gp_socket.path);
+            log_info("Rest server started on %s", hse_gparams.gp_socket.path);
         }
     }
 
-    hse_initialized = true;
-
 out:
     if (err) {
-        if (platform_initialized)
-            hse_platform_fini();
+        hse_platform_fini();
         logging_fini();
+    } else {
+        hse_initialized = true;
     }
 
     mutex_unlock(&hse_lock);
@@ -182,15 +183,14 @@ hse_fini(void)
 {
     mutex_lock(&hse_lock);
 
-    if (!hse_initialized)
-        return;
+    if (hse_initialized) {
+        rest_server_stop();
 
-    rest_server_stop();
-
-    ikvdb_fini();
-    hse_platform_fini();
-    logging_fini();
-    hse_initialized = false;
+        ikvdb_fini();
+        hse_platform_fini();
+        logging_fini();
+        hse_initialized = false;
+    }
 
     mutex_unlock(&hse_lock);
 }
@@ -863,7 +863,8 @@ hse_kvs_put(
     struct kvs_vtuple vt;
     merr_t            err;
 
-    if (HSE_UNLIKELY(!handle || !key || (val_len > 0 && !val) || flags & ~HSE_KVS_PUT_MASK))
+    if (HSE_UNLIKELY(!handle || !key || (val_len > 0 && !val) || flags & ~HSE_KVS_PUT_MASK ||
+            (flags & HSE_KVS_PUT_VCOMP_MASK) == HSE_KVS_PUT_VCOMP_MASK))
         return merr(EINVAL);
 
     if (HSE_UNLIKELY(key_len > HSE_KVS_KEY_LEN_MAX))
@@ -1451,7 +1452,7 @@ hse_strerror(hse_err_t err, char *buf, size_t buf_sz)
 {
     size_t need_sz;
 
-    merr_strinfo(err, buf, buf_sz, &need_sz);
+    merr_strinfo(err, buf, buf_sz, err_ctx_strerror, &need_sz);
 
     return need_sz;
 }

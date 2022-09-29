@@ -1,6 +1,12 @@
 name: Nightly Testing
 
 on:
+  pull_request:
+    branches:
+      - master
+      - "v[0-9]+.[0-9]+"
+    paths:
+      - .github/workflows/nightly_testing.yaml
   workflow_dispatch:
     inputs:
       branch:
@@ -39,19 +45,13 @@ jobs:
     needs:
       - determine-tag
     container:
-      image: ghcr.io/hse-project/ci-images/${{ matrix.image }}:${{ needs.determine-tag.outputs.tag }}
+      image: ghcr.io/hse-project/ci-images/ubuntu-20.04:${{ needs.determine-tag.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
-        image:
-          - ubuntu-20.04
         buildtype: [release, debug]
 
     steps:
-      - name: Freeing up disk space on CI system
-        run: |
-          df -h
-
       - name: Checkout HSE
         uses: actions/checkout@v3
         with:
@@ -103,7 +103,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: subprojects/packagecache
-          key: meson-packagecache-${{ matrix.os }}-${{ hashFiles('subprojects/*.wrap') }}
+          key: meson-packagecache-ubuntu-20.04-${{ hashFiles('subprojects/*.wrap') }}
 
       - name: Setup
         run: |
